@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: nginx-app1
+  name: nginx-app1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-app1
+  template:
+    metadata:
+      labels:
+        app: nginx-app1
+    spec:
+      containers:
+      - image: mcr.microsoft.com/oss/nginx/nginx:1.19.5
+        name: webapp
+        imagePullPolicy: Always
+        resources: {}
+        ports:
+          - containerPort: 80
+        volumeMounts:
+          - name: pvc-blob1
+            mountPath: /usr/share/nginx/html
+      volumes: 
+        - name: pvc-blob1 
+          persistentVolumeClaim: 
+            claimName:  pvc-blob1
+status: {}
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-app1
+  labels:
+    run: nginx-app1
+spec:
+  ports:
+  - port: 80
+    protocol: TCP
+  selector:
+    app: nginx-app1
+  type: LoadBalancer
+
