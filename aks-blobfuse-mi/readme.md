@@ -41,8 +41,8 @@ When newer versions of the extension are released, run the following command to 
 az extension update --name aks-preview
 ```
 
-## Demo installation
-
+## Automated installation
+You can either go for the automated installation or do it all manually. This is the automated installation.
 1. Run the setup
     ```powershell
     # run setup
@@ -53,6 +53,7 @@ az extension update --name aks-preview
 
 
 ## Manual installation instructions
+You can either go for the automated installation or do it all manually. This is the manual installation instruction.
 
 1. Create resource group
     ```bash
