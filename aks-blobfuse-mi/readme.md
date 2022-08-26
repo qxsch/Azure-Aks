@@ -57,7 +57,7 @@ az extension update --name aks-preview
 1. Create resource group
     ```bash
     resourcegroup="aks-fuseblob-mi"
-    az group create -l eastus -n  aks-fuseblob-mi
+    az group create -l eastus -n "$resourcegroup"
     ```
 
 1. Create storage account container and upload file
