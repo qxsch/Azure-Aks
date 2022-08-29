@@ -1,5 +1,9 @@
 # Mount an azure blob storage with a dedicated user-assigned managed indentity
 
+In case you have the requirement, that your AKS cluster has to access a blob storage with a dedicated user, the following solution will do this.
+
+You can also use a differnt managed-identity for different persistent volumes (f.e. you have a pod, that should just have write access to some objects while having another pod, that should have write access everywhere.)
+
 ![Solution overview](drawings/setup.png "Solution overview")
 
 ## Before you begin
@@ -94,7 +98,7 @@ You can either go for the automated installation or do it all manually. This is 
         --generate-ssh-keys
     ```
 
-1. Assign the user-assigned managed identity to the AKS vm scale set
+1. Assign the user-assigned managed identity to the AKS vm scale set (system nodepool)
     ```bash
     aksnprg="$(az aks list -g "$resourcegroup" --query "[?name == '$aksname'].nodeResourceGroup" -o tsv)"
     aksnp="$(az vmss list -g "$aksnprg" --query "[?starts_with(name, 'aks-nodepool1-')].name" -o tsv)"
@@ -229,6 +233,89 @@ You can either go for the automated installation or do it all manually. This is 
     echo "Please surf to: http://$(kubectl.exe get service --field-selector  metadata.name==nginx-app1 -o 'jsonpath={.items[*].status.loadBalancer.ingress[*].ip}')/test.htm"
     ```
 
+# how to add another pv with a dedicated user-assigned identity?
+
+1. Create another user-assigned managed identity and give access to storage account
+    ```bash
+    az identity create -n myaksblobmi2 -g "$resourcegroup"
+    miioid="$(az identity list -g "$resourcegroup" --query "[?name == 'myaksblobmi2'].principalId" -o tsv)"
+    said="$(az storage account list -g "$resourcegroup" --query "[?name == '$storageaccountname'].id" -o tsv)"
+    az role assignment create --assignee-object-id "$miioid" --role "Storage Blob Data Reader" --scope "$said"
+    ```
+
+1. Assign the user-assigned managed identity to the AKS vm scale set (system nodepool)
+    ```bash
+    aksnprg="$(az aks list -g "$resourcegroup" --query "[?name == '$aksname'].nodeResourceGroup" -o tsv)"
+    aksnp="$(az vmss list -g "$aksnprg" --query "[?starts_with(name, 'aks-nodepool1-')].name" -o tsv)"
+    miid="$(az identity list -g "$resourcegroup" --query "[?name == 'myaksblobmi2'].id" -o tsv)"
+    az vmss identity assign -g "$aksnprg" -n "$aksnp" --identities "$miid"
+    ```
+
+1. Get the objectID of your user-assigned managed identity
+    ```bash
+    az identity list -g -g "$resourcegroup" --query "[?name == 'myaksblobmi2'].principalId" -o tsv
+    ```
+
+1. Create a ``volume2.yaml`` file and set objectID for ``AzureStorageIdentityObjectID``. \
+   Please also check ``resourceGroup`` and ``storageAccount``.
+    ```yml
+    apiVersion: v1
+    kind: PersistentVolume
+    metadata:
+      name: pv-blob2
+    spec:
+      capacity:
+        storage: 10Gi
+      accessModes:
+        - ReadWriteMany
+      persistentVolumeReclaimPolicy: Retain  # If set as "Delete" container would be removed after pvc deletion
+      storageClassName: azureblob-fuse-premium
+      mountOptions:
+        - -o allow_other
+        - --file-cache-timeout-in-seconds=120
+      csi:
+        driver: blob.csi.azure.com
+        readOnly: false
+        # make sure this volumeid is unique in the cluster
+        # `#` is not allowed in self defined volumeHandle
+        volumeHandle: pv-blob2
+        volumeAttributes:
+          protocol: fuse
+          resourceGroup: aks-fuseblob-mi
+          storageAccount: myaksblob
+          containerName: mycontainer
+          AzureStorageAuthType: MSI
+          AzureStorageIdentityObjectID: "xxxxx-xxxx-xxx-xxx-xxxxxxx"
+    
+    ---
+    
+    apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      name: pvc-blob2
+    spec:
+      accessModes:
+        - ReadWriteMany
+      resources:
+        requests:
+          storage: 10Gi
+      volumeName: pv-blob2
+      storageClassName: azureblob-fuse-premium
+    ```
+
+1. Apply the ``volume2.yaml`` file
+    ```bash
+    # create pv and pvc
+    kubectl.exe apply -f .\volume2.yaml
+    # check it
+    kubectl.exe get pv -A
+    kubectl.exe get pvc -A
+    ```
+
+1. Now you can use the persistent volume claim ``pv-blob2`` in another deployment.
+
+# Security consideration
+You should use at least 2 nodepools (a system and a user node pool) and assign the storage identities just to the system nodepool. This way your application cannot request tokens for the storage identity from the metadata endpoint.
 
 
 [install-azure-cli]: https://docs.microsoft.com/en-us/cli/azure/install-azure-cli
