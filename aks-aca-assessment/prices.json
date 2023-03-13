@@ -1,0 +1,18 @@
+{
+    "westeurope" : {
+        "vCPUSecondsFreeGrant": 180000,
+        "vCPUSecondsPrice":     0.000022,
+        "vCPUSteps":            0.25,
+        "memoryGBSecondsFreeGrant": 360000,
+        "memoryGBSecondsPrice":     0.000003,
+        "memoryGBSteps":      0.5
+    },
+    "default" : {
+        "vCPUSecondsFreeGrant": 180000,
+        "vCPUSecondsPrice":     0.000022,
+        "vCPUSteps":            0.25,
+        "memoryGBSecondsFreeGrant": 360000,
+        "memoryGBSecondsPrice":     0.000003,
+        "memoryGBSteps":      0.5
+    }
+}
