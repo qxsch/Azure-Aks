@@ -1,4 +1,4 @@
-# Mount an azure blob storage with a dedicated user-assigned managed indentity
+# Assess a shared AKS cluster for ACA migration
 
 **Scenario:** You have a shared AKS cluster for low profile applications (with < 5 pods per app) and each application resides in its own namespace.
 
