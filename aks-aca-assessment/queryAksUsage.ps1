@@ -482,7 +482,7 @@ foreach($cluster in Get-AzAksCluster) {
         $o.SumOfMaxUsedRssMemoryGBs = [math]::Round($o.SumOfMaxUsedRssMemoryGBs, 4)
         $o.SumOfP99UsedRssMemoryGBs = [math]::Round($o.SumOfP99UsedRssMemoryGBs, 4)
         $o.calculatePrice($cluster.Location, $true) | Out-Null
-        return $_
+        return $o
     } | Export-Csv -Path ($subscriptionName + "__" + $cluster.ResourceGroupName + "__" + $cluster.Name + ".csv") -Encoding utf8BOM
 
     if($exportPodInfo) {
