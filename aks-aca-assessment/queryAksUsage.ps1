@@ -473,25 +473,29 @@ foreach($cluster in Get-AzAksCluster) {
     }
     Write-Host -ForegroundColor Blue ( "  -> Exporting Cluster Namespace Summary CSV to: " + ($subscriptionName + "__" + $cluster.ResourceGroupName + "__" + $cluster.Name + ".csv"))
     $workspaceKubeInfo[$workspaceId].getNamespaceConsumptionByClusterId($cluster.Id, $cluster.Location) | ForEach-Object {
+        $o = $_.psobject.copy()
         # round stats
-        $_.SumOfAvgCPUUsageCores = [math]::Round($_.SumOfAvgCPUUsageCores, 4)
-        $_.SumOfMaxCPUUsageCores = [math]::Round($_.SumOfMaxCPUUsageCores, 4)
-        $_.SumOfP99CPUUsageCores = [math]::Round($_.SumOfP99CPUUsageCores, 4)
-        $_.SumOfAvgUsedRssMemoryGBs = [math]::Round($_.SumOfAvgUsedRssMemoryGBs, 4)
-        $_.SumOfMaxUsedRssMemoryGBs = [math]::Round($_.SumOfMaxUsedRssMemoryGBs, 4)
-        $_.SumOfP99UsedRssMemoryGBs = [math]::Round($_.SumOfP99UsedRssMemoryGBs, 4)
-        $_.calculatePrice($cluster.Location, $true) | Out-Null
+        $o.SumOfAvgCPUUsageCores = [math]::Round($o.SumOfAvgCPUUsageCores, 4)
+        $o.SumOfMaxCPUUsageCores = [math]::Round($o.SumOfMaxCPUUsageCores, 4)
+        $o.SumOfP99CPUUsageCores = [math]::Round($o.SumOfP99CPUUsageCores, 4)
+        $o.SumOfAvgUsedRssMemoryGBs = [math]::Round($o.SumOfAvgUsedRssMemoryGBs, 4)
+        $o.SumOfMaxUsedRssMemoryGBs = [math]::Round($o.SumOfMaxUsedRssMemoryGBs, 4)
+        $o.SumOfP99UsedRssMemoryGBs = [math]::Round($o.SumOfP99UsedRssMemoryGBs, 4)
+        $o.calculatePrice($cluster.Location, $true) | Out-Null
+        return $_
     } | Export-Csv -Path ($subscriptionName + "__" + $cluster.ResourceGroupName + "__" + $cluster.Name + ".csv") -Encoding utf8BOM
 
     if($exportPodInfo) {
         Write-Host -ForegroundColor Blue ( "  -> Exporting Cluster Pod Info CSV to: " + ($subscriptionName + "__" + $cluster.ResourceGroupName + "__" + $cluster.Name + "-podinfos.csv"))
         $workspaceKubeInfo[$workspaceId].getPodsByClusterId($cluster.Id) | ForEach-Object {
-            $_.AvgCPUUsageCores = [math]::Round($_.AvgCPUUsageCores, 4)
-            $_.MaxCPUUsageCores = [math]::Round($_.MaxCPUUsageCores, 4)
-            $_.P99CPUUsageCores = [math]::Round($_.P99CPUUsageCores, 4)
-            $_.AvgUsedRssMemoryGBs = [math]::Round($_.AvgUsedRssMemoryGBs, 4)
-            $_.MaxUsedRssMemoryGBs = [math]::Round($_.MaxUsedRssMemoryGBs, 4)
-            $_.P99UsedRssMemoryGBs = [math]::Round($_.P99UsedRssMemoryGBs, 4)
+            $o = $_.psobject.copy()
+            $o.AvgCPUUsageCores = [math]::Round($o.AvgCPUUsageCores, 4)
+            $o.MaxCPUUsageCores = [math]::Round($o.MaxCPUUsageCores, 4)
+            $o.P99CPUUsageCores = [math]::Round($o.P99CPUUsageCores, 4)
+            $o.AvgUsedRssMemoryGBs = [math]::Round($o.AvgUsedRssMemoryGBs, 4)
+            $o.MaxUsedRssMemoryGBs = [math]::Round($o.MaxUsedRssMemoryGBs, 4)
+            $o.P99UsedRssMemoryGBs = [math]::Round($o.P99UsedRssMemoryGBs, 4)
+            return $o
         } | Export-Csv -Path ($subscriptionName + "__" + $cluster.ResourceGroupName + "__" + $cluster.Name + "-podinfos.csv") -Encoding utf8BOM
     }
 }

@@ -164,6 +164,8 @@ foreach($cluster in Get-AzAksCluster) {
 
 $allCostSummary | ForEach-Object {
     # round stats
-    $_.RawPureAksCosts = [math]::Round($_.RawPureAksCosts, 4)
-    $_.NormalizedPureAksCosts = [math]::Round($_.NormalizedPureAksCosts, 4)
+    $o = $_.psobject.copy()
+    $o.RawPureAksCosts = [math]::Round($o.RawPureAksCosts, 4)
+    $o.NormalizedPureAksCosts = [math]::Round($o.NormalizedPureAksCosts, 4)
+    return $o
 } | Export-Csv -Path ($subscriptionName + "-summary.csv") -Encoding utf8BOM
