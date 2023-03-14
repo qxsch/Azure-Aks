@@ -8,9 +8,6 @@
  1. Run the script to get the current pure AKS costs: ``./queryPureAksCosts.ps1`` ( you can optionally use ``-susbcriptionId`` or ``-subscriptionName`` to set the process context )
 
 
-## Why average and 99th percentile?
-Depending on the workload, the costs will usually be between average and 99th percentile. So the assessment can give you a range (from better to worse case).
-
 ## Why 45% and 20% idling?
 The assessment is based on common usage patterns as stated below:
 ```
