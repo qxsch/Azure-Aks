@@ -1,6 +1,13 @@
 # Assess a shared AKS cluster for ACA migration
 
 **Scenario:** You have a shared AKS cluster for low profile applications (with < 5 pods per app) and each application resides in its own namespace.
+
+## Prerequisites
+ 1. Please install powershell 7 and AZ modules
+ 1. Login to Azure ``Connect-AzAccount``
+ 1. Ensure that you have at least ``Reader`` role on subscription level (that you want to assess).
+
+## How to use?
  1. Edit the ``prices.json`` file with your prices. You can also get the list prices in your currency here: https://azure.microsoft.com/en-us/pricing/details/container-apps/
  1. Run the script to assess all AKS clusters in a subscription: ``./queryAksUsage.ps1`` ( you can optionally use ``-susbcriptionId`` or ``-subscriptionName`` to set the process context )
     * It will give you estimates for 3 scenarios (no idling, 45% idle, 20% idle)
