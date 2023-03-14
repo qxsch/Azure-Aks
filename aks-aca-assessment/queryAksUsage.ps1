@@ -2,7 +2,8 @@ param(
     [string]$subscriptionName = "",
     [string]$subscriptionGuid = "",
     [string]$month = "",
-    [string]$pricesJson = "prices.json"
+    [string]$pricesJson = "prices.json",
+    [switch]$exportPodInfo
 )
 
 Import-Module Az -ErrorAction Stop
@@ -377,6 +378,17 @@ class KubernetesInfo {
         return $this.podInventory.Values
     }
 
+    [PodInfo[]] getPodsByClusterId([string]$clusterId) {
+        $pods = @()
+        foreach($pod in $this.getPods()) {
+            if($pod.ClusterId -ne $clusterId) {
+                continue
+            }
+            $pods += $pod
+        }
+        return $pods
+    }
+
     [NamespaceConsumptionSummary[]] getNamespaceConsumptionByClusterId([string]$clusterId, [string]$location) {
         # trying to resolve steps per container
         try {
@@ -459,18 +471,28 @@ foreach($cluster in Get-AzAksCluster) {
     if(-not $workspaceKubeInfo.ContainsKey($workspaceId)) {
         $workspaceKubeInfo[$workspaceId] = [KubernetesInfo]::new($workspaceId)
     }
-    Write-Host -ForegroundColor Blue ( "  -> Exporting CSV to: " + ($subscriptionName + "__" + $cluster.ResourceGroupName + "__" + $cluster.Name + ".csv"))
+    Write-Host -ForegroundColor Blue ( "  -> Exporting Cluster Namespace Summary CSV to: " + ($subscriptionName + "__" + $cluster.ResourceGroupName + "__" + $cluster.Name + ".csv"))
     $workspaceKubeInfo[$workspaceId].getNamespaceConsumptionByClusterId($cluster.Id, $cluster.Location) | ForEach-Object {
-        # clone and round stats
-        $o = $_.psobject.copy()
-        $o.SumOfAvgCPUUsageCores = [math]::Round($o.SumOfAvgCPUUsageCores, 4)
-        $o.SumOfMaxCPUUsageCores = [math]::Round($o.SumOfMaxCPUUsageCores, 4)
-        $o.SumOfP99CPUUsageCores = [math]::Round($o.SumOfP99CPUUsageCores, 4)
-        $o.SumOfAvgUsedRssMemoryGBs = [math]::Round($o.SumOfAvgUsedRssMemoryGBs, 4)
-        $o.SumOfMaxUsedRssMemoryGBs = [math]::Round($o.SumOfMaxUsedRssMemoryGBs, 4)
-        $o.SumOfP99UsedRssMemoryGBs = [math]::Round($o.SumOfP99UsedRssMemoryGBs, 4)
-        $o.calculatePrice($cluster.Location, $true)
-        return $o
+        # round stats
+        $_.SumOfAvgCPUUsageCores = [math]::Round($_.SumOfAvgCPUUsageCores, 4)
+        $_.SumOfMaxCPUUsageCores = [math]::Round($_.SumOfMaxCPUUsageCores, 4)
+        $_.SumOfP99CPUUsageCores = [math]::Round($_.SumOfP99CPUUsageCores, 4)
+        $_.SumOfAvgUsedRssMemoryGBs = [math]::Round($_.SumOfAvgUsedRssMemoryGBs, 4)
+        $_.SumOfMaxUsedRssMemoryGBs = [math]::Round($_.SumOfMaxUsedRssMemoryGBs, 4)
+        $_.SumOfP99UsedRssMemoryGBs = [math]::Round($_.SumOfP99UsedRssMemoryGBs, 4)
+        $_.calculatePrice($cluster.Location, $true) | Out-Null
     } | Export-Csv -Path ($subscriptionName + "__" + $cluster.ResourceGroupName + "__" + $cluster.Name + ".csv") -Encoding utf8BOM
+
+    if($exportPodInfo) {
+        Write-Host -ForegroundColor Blue ( "  -> Exporting Cluster Pod Info CSV to: " + ($subscriptionName + "__" + $cluster.ResourceGroupName + "__" + $cluster.Name + "-podinfos.csv"))
+        $workspaceKubeInfo[$workspaceId].getPodsByClusterId($cluster.Id) | ForEach-Object {
+            $_.AvgCPUUsageCores = [math]::Round($_.AvgCPUUsageCores, 4)
+            $_.MaxCPUUsageCores = [math]::Round($_.MaxCPUUsageCores, 4)
+            $_.P99CPUUsageCores = [math]::Round($_.P99CPUUsageCores, 4)
+            $_.AvgUsedRssMemoryGBs = [math]::Round($_.AvgUsedRssMemoryGBs, 4)
+            $_.MaxUsedRssMemoryGBs = [math]::Round($_.MaxUsedRssMemoryGBs, 4)
+            $_.P99UsedRssMemoryGBs = [math]::Round($_.P99UsedRssMemoryGBs, 4)
+        } | Export-Csv -Path ($subscriptionName + "__" + $cluster.ResourceGroupName + "__" + $cluster.Name + "-podinfos.csv") -Encoding utf8BOM
+    }
 }
 
