@@ -87,6 +87,35 @@ class NamespaceConsumptionSummary {
         $this.SumOfP99UsedRssMemoryGBs += $P99UsedRssMemoryGBs
     }
 
+    [double] getUsageBasedPrice(
+        [double]$idlePercent,
+        [int]   $vCPUSecondsFreeGrant,
+        [double]$vCPUSteps,
+        [double]$vCPUSecondsPrice,
+        [double]$vCPUSecondsIdlePrice,
+        [int]   $memoryGBSecondsFreeGrant,
+        [double]$memoryGBSteps,
+        [double]$memoryGBSecondsPrice,
+        [double]$memoryGBSecondsIdlePrice,
+        [double]$usedCPUCores,
+        [double]$usedMemoryGBs
+    ) {
+        if($idlePercent -lt 0 -or $idlePercent -gt 1) {
+            throw "idlePercent must be between 0 and 1"
+        }
+        $activeSecondsInMonth = (3600 * 24 * 30) * (1 - $idlePercent)
+        $idleSecondsInMonth = (3600 * 24 * 30) * $idlePercent
+
+        $price = 0.0
+
+        $price += (([Math]::Ceiling([Math]::Max(($usedMemoryGBs * $activeSecondsInMonth) - $memoryGBSecondsFreeGrant, 0) / $memoryGBSteps) * $memoryGBSteps) * $memoryGBSecondsPrice)
+        $price += (([Math]::Ceiling([Math]::Max(($usedMemoryGBs * $idleSecondsInMonth), 0) / $memoryGBSteps) * $memoryGBSteps) * $memoryGBSecondsIdlePrice)
+        $price += (([Math]::Ceiling([Math]::Max(($usedCPUCores * $activeSecondsInMonth) - $vCPUSecondsFreeGrant, 0) / $vCPUSteps) * $vCPUSteps) * $vCPUSecondsPrice)
+        $price += (([Math]::Ceiling([Math]::Max(($usedCPUCores * $idleSecondsInMonth), 0) / $vCPUSteps) * $vCPUSteps) * $vCPUSecondsIdlePrice)
+
+        return $price
+    }
+
     [NamespaceConsumptionSummary] calculatePrice([string] $location, [bool] $round) {
         $this.priceAvgWithoutIdle = 0.0
         $this.priceAvgWith45PercentIdle = 0.0
@@ -109,7 +138,7 @@ class NamespaceConsumptionSummary {
             Write-Host -ForegroundColor Red "Cannot calculate prices (Data type is not a JSON Object)"
             return $this
         }
-        foreach($k in @("vCPUSecondsFreeGrant", "vCPUSecondsPrice", "vCPUSteps", "memoryGBSecondsFreeGrant", "memoryGBSecondsPrice", "memoryGBSteps" )) {
+        foreach($k in @("vCPUSecondsFreeGrant", "vCPUSecondsPrice", "vCPUSecondsIdlePrice", "vCPUSteps", "memoryGBSecondsFreeGrant", "memoryGBSecondsPrice", "memoryGBSecondsIdlePrice", "memoryGBSteps")) {
             if(-not $priceDef.ContainsKey($k)) {
                 Write-Host -ForegroundColor Red "Cannot calculate prices (JSON Object is missing the required key $k)"
                 return $this
@@ -121,22 +150,87 @@ class NamespaceConsumptionSummary {
                 $priceDef[$k] = [double]$priceDef[$k]
             }
         }
-
-        $activeSecondsInMonth = (3600 * 24 * 30)
-        $this.priceAvgWithoutIdle += (([Math]::Ceiling([Math]::Max(($this.SumOfAvgUsedRssMemoryGBs * $activeSecondsInMonth) - $priceDef["memoryGBSecondsFreeGrant"], 0) / $priceDef["memoryGBSteps"]) * $priceDef["memoryGBSteps"]) * $priceDef["memoryGBSecondsPrice"])
-        $this.priceAvgWithoutIdle += (([Math]::Ceiling([Math]::Max(($this.SumOfAvgCPUUsageCores * $activeSecondsInMonth) - $priceDef["vCPUSecondsFreeGrant"], 0) / $priceDef["vCPUSteps"]) * $priceDef["vCPUSteps"]) * $priceDef["vCPUSecondsPrice"])
-        $this.price99thWithoutIdle += (([Math]::Ceiling([Math]::Max(($this.SumOfP99UsedRssMemoryGBs * $activeSecondsInMonth) - $priceDef["memoryGBSecondsFreeGrant"], 0) / $priceDef["memoryGBSteps"]) * $priceDef["memoryGBSteps"]) * $priceDef["memoryGBSecondsPrice"])
-        $this.price99thWithoutIdle += (([Math]::Ceiling([Math]::Max(($this.SumOfP99CPUUsageCores * $activeSecondsInMonth) - $priceDef["vCPUSecondsFreeGrant"], 0) / $priceDef["vCPUSteps"]) * $priceDef["vCPUSteps"]) * $priceDef["vCPUSecondsPrice"])
-        $activeSecondsInMonth = (3600 * 24 * 30) * 0.55   # 0.55 = 1 - 0.45
-        $this.priceAvgWith45PercentIdle += (([Math]::Ceiling([Math]::Max(($this.SumOfAvgUsedRssMemoryGBs * $activeSecondsInMonth) - $priceDef["memoryGBSecondsFreeGrant"], 0) / $priceDef["memoryGBSteps"]) * $priceDef["memoryGBSteps"]) * $priceDef["memoryGBSecondsPrice"])
-        $this.priceAvgWith45PercentIdle += (([Math]::Ceiling([Math]::Max(($this.SumOfAvgCPUUsageCores * $activeSecondsInMonth) - $priceDef["vCPUSecondsFreeGrant"], 0) / $priceDef["vCPUSteps"]) * $priceDef["vCPUSteps"]) * $priceDef["vCPUSecondsPrice"])
-        $this.price99thWith45PercentIdle += (([Math]::Ceiling([Math]::Max(($this.SumOfP99UsedRssMemoryGBs * $activeSecondsInMonth) - $priceDef["memoryGBSecondsFreeGrant"], 0) / $priceDef["memoryGBSteps"]) * $priceDef["memoryGBSteps"]) * $priceDef["memoryGBSecondsPrice"])
-        $this.price99thWith45PercentIdle += (([Math]::Ceiling([Math]::Max(($this.SumOfP99CPUUsageCores * $activeSecondsInMonth) - $priceDef["vCPUSecondsFreeGrant"], 0) / $priceDef["vCPUSteps"]) * $priceDef["vCPUSteps"]) * $priceDef["vCPUSecondsPrice"])
-        $activeSecondsInMonth = (3600 * 24 * 30) * 0.80   # 0.80 = 1 - 0.20
-        $this.priceAvgWith20PercentIdle += (([Math]::Ceiling([Math]::Max(($this.SumOfAvgUsedRssMemoryGBs * $activeSecondsInMonth) - $priceDef["memoryGBSecondsFreeGrant"], 0) / $priceDef["memoryGBSteps"]) * $priceDef["memoryGBSteps"]) * $priceDef["memoryGBSecondsPrice"])
-        $this.priceAvgWith20PercentIdle += (([Math]::Ceiling([Math]::Max(($this.SumOfAvgCPUUsageCores * $activeSecondsInMonth) - $priceDef["vCPUSecondsFreeGrant"], 0) / $priceDef["vCPUSteps"]) * $priceDef["vCPUSteps"]) * $priceDef["vCPUSecondsPrice"])
-        $this.price99thWith20PercentIdle += (([Math]::Ceiling([Math]::Max(($this.SumOfP99UsedRssMemoryGBs * $activeSecondsInMonth) - $priceDef["memoryGBSecondsFreeGrant"], 0) / $priceDef["memoryGBSteps"]) * $priceDef["memoryGBSteps"]) * $priceDef["memoryGBSecondsPrice"])
-        $this.price99thWith20PercentIdle += (([Math]::Ceiling([Math]::Max(($this.SumOfP99CPUUsageCores * $activeSecondsInMonth) - $priceDef["vCPUSecondsFreeGrant"], 0) / $priceDef["vCPUSteps"]) * $priceDef["vCPUSteps"]) * $priceDef["vCPUSecondsPrice"])
+        # no idling calculation
+        $this.priceAvgWithoutIdle += $this.getUsageBasedPrice(
+            0,
+            $priceDef["vCPUSecondsFreeGrant"],
+            $priceDef["vCPUSteps"],
+            $priceDef["vCPUSecondsPrice"],
+            $priceDef["vCPUSecondsIdlePrice"],
+            $priceDef["memoryGBSecondsFreeGrant"],
+            $priceDef["memoryGBSteps"],
+            $priceDef["memoryGBSecondsPrice"],
+            $priceDef["memoryGBSecondsIdlePrice"],
+            $this.SumOfAvgCPUUsageCores,
+            $this.SumOfAvgUsedRssMemoryGBs
+        )
+        $this.price99thWithoutIdle += $this.getUsageBasedPrice(
+            0,
+            $priceDef["vCPUSecondsFreeGrant"],
+            $priceDef["vCPUSteps"],
+            $priceDef["vCPUSecondsPrice"],
+            $priceDef["vCPUSecondsIdlePrice"],
+            $priceDef["memoryGBSecondsFreeGrant"],
+            $priceDef["memoryGBSteps"],
+            $priceDef["memoryGBSecondsPrice"],
+            $priceDef["memoryGBSecondsIdlePrice"],
+            $this.SumOfP99CPUUsageCores,
+            $this.SumOfP99UsedRssMemoryGBs
+        )
+        # 45 percent idle calculation
+        $this.priceAvgWith45PercentIdle += $this.getUsageBasedPrice(
+            0.45,
+            $priceDef["vCPUSecondsFreeGrant"],
+            $priceDef["vCPUSteps"],
+            $priceDef["vCPUSecondsPrice"],
+            $priceDef["vCPUSecondsIdlePrice"],
+            $priceDef["memoryGBSecondsFreeGrant"],
+            $priceDef["memoryGBSteps"],
+            $priceDef["memoryGBSecondsPrice"],
+            $priceDef["memoryGBSecondsIdlePrice"],
+            $this.SumOfAvgCPUUsageCores,
+            $this.SumOfAvgUsedRssMemoryGBs
+        )
+        $this.price99thWith45PercentIdle += $this.getUsageBasedPrice(
+            0.45,
+            $priceDef["vCPUSecondsFreeGrant"],
+            $priceDef["vCPUSteps"],
+            $priceDef["vCPUSecondsPrice"],
+            $priceDef["vCPUSecondsIdlePrice"],
+            $priceDef["memoryGBSecondsFreeGrant"],
+            $priceDef["memoryGBSteps"],
+            $priceDef["memoryGBSecondsPrice"],
+            $priceDef["memoryGBSecondsIdlePrice"],
+            $this.SumOfP99CPUUsageCores,
+            $this.SumOfP99UsedRssMemoryGBs
+        )
+        # 20 percent idle calculation
+        $this.priceAvgWith20PercentIdle += $this.getUsageBasedPrice(
+            0.20,
+            $priceDef["vCPUSecondsFreeGrant"],
+            $priceDef["vCPUSteps"],
+            $priceDef["vCPUSecondsPrice"],
+            $priceDef["vCPUSecondsIdlePrice"],
+            $priceDef["memoryGBSecondsFreeGrant"],
+            $priceDef["memoryGBSteps"],
+            $priceDef["memoryGBSecondsPrice"],
+            $priceDef["memoryGBSecondsIdlePrice"],
+            $this.SumOfAvgCPUUsageCores,
+            $this.SumOfAvgUsedRssMemoryGBs
+        )
+        $this.price99thWith20PercentIdle += $this.getUsageBasedPrice(
+            0.20,
+            $priceDef["vCPUSecondsFreeGrant"],
+            $priceDef["vCPUSteps"],
+            $priceDef["vCPUSecondsPrice"],
+            $priceDef["vCPUSecondsIdlePrice"],
+            $priceDef["memoryGBSecondsFreeGrant"],
+            $priceDef["memoryGBSteps"],
+            $priceDef["memoryGBSecondsPrice"],
+            $priceDef["memoryGBSecondsIdlePrice"],
+            $this.SumOfP99CPUUsageCores,
+            $this.SumOfP99UsedRssMemoryGBs
+        )
 
         if($round) {
             $this.priceAvgWithoutIdle        = [math]::Round($this.priceAvgWithoutIdle, 4)
@@ -283,7 +377,27 @@ class KubernetesInfo {
         return $this.podInventory.Values
     }
 
-    [NamespaceConsumptionSummary[]] getNamespaceConsumptionByClusterId([string]$clusterId) {
+    [NamespaceConsumptionSummary[]] getNamespaceConsumptionByClusterId([string]$clusterId, [string]$location) {
+        # trying to resolve steps per container
+        try {
+            if($script:prices.ContainsKey($location)) {
+                $memoryGBSteps = [double] $script:prices[$location]["memoryGBSteps"]
+                $vCPUSteps = [double] $script:prices[$location]["vCPUSteps"]
+            }
+            elseif($script:prices.ContainsKey("default")) {
+                $memoryGBSteps = [double] $script:prices["default"]["memoryGBSteps"]
+                $vCPUSteps = [double] $script:prices["default"]["vCPUSteps"]
+            }
+            else {
+                $memoryGBSteps = 0.25
+                $vCPUSteps = 0.25
+            }
+        }
+        catch {
+            $memoryGBSteps = 0.25
+            $vCPUSteps = 0.25
+        }
+
         $namespaces = @{}
         foreach($pod in $this.getPods()) {
             if($pod.ClusterId -ne $clusterId) {
@@ -299,13 +413,14 @@ class KubernetesInfo {
                 $namespaces[$pod.Namespace].NoStatsPods++
                 continue
             }
+            
             $namespaces[$pod.Namespace].addUsage(
-                $pod.AvgCPUUsageCores,
-                $pod.MaxCPUUsageCores,
-                $pod.P99CPUUsageCores,
-                $pod.AvgUsedRssMemoryGBs,
-                $pod.MaxUsedRssMemoryGBs,
-                $pod.P99UsedRssMemoryGBs
+                [Math]::Ceiling($pod.AvgCPUUsageCores / $vCPUSteps) * $vCPUSteps,
+                [Math]::Ceiling($pod.MaxCPUUsageCores / $vCPUSteps) * $vCPUSteps,
+                [Math]::Ceiling($pod.P99CPUUsageCores / $vCPUSteps) * $vCPUSteps,
+                [Math]::Ceiling($pod.AvgUsedRssMemoryGBs / $memoryGBSteps) * $memoryGBSteps,
+                [Math]::Ceiling($pod.MaxUsedRssMemoryGBs / $memoryGBSteps) * $memoryGBSteps,
+                [Math]::Ceiling($pod.P99UsedRssMemoryGBs / $memoryGBSteps) * $memoryGBSteps
             )
         }
         return $namespaces.Values
@@ -345,7 +460,7 @@ foreach($cluster in Get-AzAksCluster) {
         $workspaceKubeInfo[$workspaceId] = [KubernetesInfo]::new($workspaceId)
     }
     Write-Host -ForegroundColor Blue ( "  -> Exporting CSV to: " + ($subscriptionName + "__" + $cluster.ResourceGroupName + "__" + $cluster.Name + ".csv"))
-    $workspaceKubeInfo[$workspaceId].getNamespaceConsumptionByClusterId($cluster.Id) | ForEach-Object {
+    $workspaceKubeInfo[$workspaceId].getNamespaceConsumptionByClusterId($cluster.Id, $cluster.Location) | ForEach-Object {
         # clone and round stats
         $o = $_.psobject.copy()
         $o.SumOfAvgCPUUsageCores = [math]::Round($o.SumOfAvgCPUUsageCores, 4)
