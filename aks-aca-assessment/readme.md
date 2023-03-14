@@ -17,8 +17,8 @@ The assessment is based on common usage patterns as stated below:
 Example 45% idle profile
 Day   |   Usage
 ------+--------
-Mon   |   16h		    Total	168h
-Tue   |   16h		    Usage	54.76%
+Mon   |   16h		    Total   168h
+Tue   |   16h		    Usage   54.76%
 Wed   |   16h		    Idle    45.24%
 Thu   |   16h
 Fri   |   16h
@@ -29,8 +29,8 @@ Sun   |    6h
 Example 20% idle profile
 Day   |   Usage
 ------+--------
-Mon   |   20h		    Total	168
-Tue   |   20h		    Usage	79.76%
+Mon   |   20h		    Total   168
+Tue   |   20h		    Usage   79.76%
 Wed   |   20h		    Idle    20.24%
 Thu   |   20h
 Fri   |   20h
