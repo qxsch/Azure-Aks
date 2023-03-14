@@ -3,9 +3,9 @@
 **Scenario:** You have a shared AKS cluster for low profile applications (with < 5 pods per app) and each application resides in its own namespace.
 
 ## Prerequisites
- 1. Please install powershell 7 and AZ modules
+ 1. Please install Powershell 7 and AZ modules
  1. Login to Azure ``Connect-AzAccount``
- 1. Ensure that you have at least ``Reader`` role on subscription level (that you want to assess).
+ 1. Ensure that you have at least ``Reader`` role on subscription level (of subscriptions that you want to assess).
 
 ## How to use?
  1. Edit the ``prices.json`` file with your prices. You can also get the list prices in your currency here: https://azure.microsoft.com/en-us/pricing/details/container-apps/
