@@ -2,31 +2,25 @@
     "eastus2" : {
         "vCPUSecondsFreeGrant": 180000,
         "vCPUSecondsPrice":     0.0000228,
-        "vCPUSecondsIdlePrice": 0.0000029,
         "vCPUSteps":            0.25,
         "memoryGBSecondsFreeGrant": 360000,
         "memoryGBSecondsPrice":     0.0000029,
-        "memoryGBSecondsIdlePrice": 0.0000029,
         "memoryGBSteps":      0.25
     },
     "westeurope" : {
         "vCPUSecondsFreeGrant": 180000,
         "vCPUSecondsPrice":     0.0000323,
-        "vCPUSecondsIdlePrice": 0.0000038,
         "vCPUSteps":            0.25,
         "memoryGBSecondsFreeGrant": 360000,
         "memoryGBSecondsPrice":     0.0000038,
-        "memoryGBSecondsIdlePrice": 0.0000038,
         "memoryGBSteps":      0.25
     },
     "default" : {
         "vCPUSecondsFreeGrant": 180000,
         "vCPUSecondsPrice":     0.0000323,
-        "vCPUSecondsIdlePrice": 0.0000038,
         "vCPUSteps":            0.25,
         "memoryGBSecondsFreeGrant": 360000,
         "memoryGBSecondsPrice":     0.0000038,
-        "memoryGBSecondsIdlePrice": 0.0000038,
         "memoryGBSteps":      0.25
     }
 }

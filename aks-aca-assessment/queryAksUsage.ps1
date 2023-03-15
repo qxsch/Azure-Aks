@@ -108,11 +108,16 @@ class NamespaceConsumptionSummary {
         $idleSecondsInMonth = (3600 * 24 * 30) * $idlePercent
 
         $price = 0.0
-
         $price += (([Math]::Ceiling([Math]::Max(($usedMemoryGBs * $activeSecondsInMonth) - $memoryGBSecondsFreeGrant, 0) / $memoryGBSteps) * $memoryGBSteps) * $memoryGBSecondsPrice)
-        $price += (([Math]::Ceiling([Math]::Max(($usedMemoryGBs * $idleSecondsInMonth), 0) / $memoryGBSteps) * $memoryGBSteps) * $memoryGBSecondsIdlePrice)
+        if($memoryGBSecondsIdlePrice -gt 0) {
+            $remainingFreeGrant = [Math]::Max($memoryGBSecondsFreeGrant - ($usedMemoryGBs * $activeSecondsInMonth), 0)
+            $price += (([Math]::Ceiling([Math]::Max(($usedMemoryGBs * $idleSecondsInMonth) - $remainingFreeGrant, 0) / $memoryGBSteps) * $memoryGBSteps) * $memoryGBSecondsIdlePrice)
+        }
         $price += (([Math]::Ceiling([Math]::Max(($usedCPUCores * $activeSecondsInMonth) - $vCPUSecondsFreeGrant, 0) / $vCPUSteps) * $vCPUSteps) * $vCPUSecondsPrice)
-        $price += (([Math]::Ceiling([Math]::Max(($usedCPUCores * $idleSecondsInMonth), 0) / $vCPUSteps) * $vCPUSteps) * $vCPUSecondsIdlePrice)
+        if($vCPUSecondsIdlePrice -gt 0) {
+            $remainingFreeGrant = [Math]::Max($vCPUSecondsFreeGrant - ($usedCPUCores * $activeSecondsInMonth), 0)
+            $price += (([Math]::Ceiling([Math]::Max(($usedCPUCores * $idleSecondsInMonth) - $remainingFreeGrant, 0) / $vCPUSteps) * $vCPUSteps) * $vCPUSecondsIdlePrice)
+        }
 
         return $price
     }
@@ -128,20 +133,21 @@ class NamespaceConsumptionSummary {
             $priceDef = $script:prices[$location]
         }
         elseif($script:prices.ContainsKey("default")) {
-            Write-Host -ForegroundColor Yellow "Cannot calculate location-based prices (Using default price)"
+            Write-Host -ForegroundColor Yellow "  -> Cannot calculate location-based prices (Using default price)"
             $priceDef = $script:prices["default"]
         }
         else {
-            Write-Host -ForegroundColor Red "Cannot calculate prices (No default price has been found)"
+            Write-Host -ForegroundColor Red "  -> Cannot calculate prices (No default price has been found)"
             return $this
         }
         if($priceDef -isnot [Hashtable]) {
-            Write-Host -ForegroundColor Red "Cannot calculate prices (Data type is not a JSON Object)"
+            Write-Host -ForegroundColor Red "  -> Cannot calculate prices (Data type is not a JSON Object)"
             return $this
         }
-        foreach($k in @("vCPUSecondsFreeGrant", "vCPUSecondsPrice", "vCPUSecondsIdlePrice", "vCPUSteps", "memoryGBSecondsFreeGrant", "memoryGBSecondsPrice", "memoryGBSecondsIdlePrice", "memoryGBSteps")) {
+        # required attributes
+        foreach($k in @("vCPUSecondsFreeGrant", "vCPUSecondsPrice", "vCPUSteps", "memoryGBSecondsFreeGrant", "memoryGBSecondsPrice", "memoryGBSteps")) {
             if(-not $priceDef.ContainsKey($k)) {
-                Write-Host -ForegroundColor Red "Cannot calculate prices (JSON Object is missing the required key $k)"
+                Write-Host -ForegroundColor Red "  -> Cannot calculate prices (JSON Object is missing the required key $k)"
                 return $this
             }
             if($k -eq "vCPUSecondsFreeGrant" -or $k -eq "memoryGBSecondsFreeGrant") {
@@ -151,6 +157,18 @@ class NamespaceConsumptionSummary {
                 $priceDef[$k] = [double]$priceDef[$k]
             }
         }
+        # optional attributes
+        foreach($k in @("memoryGBSecondsIdlePrice", "vCPUSecondsIdlePrice")) {
+            if(-not $priceDef.ContainsKey($k)) {
+                $priceDef[$k] = 0.0
+            }
+            $priceDef[$k] = [double]$priceDef[$k]
+        }
+
+        if($priceDef["memoryGBSecondsIdlePrice"] -gt 0  -or  $priceDef["vCPUSecondsIdlePrice"] -gt 0) {
+            Write-Host -ForegroundColor Yellow "  -> It's recommended scaling to 0, whenever containers are idling. This way you can set memoryGBSecondsIdlePrice and vCPUSecondsIdlePrice to 0.0 in the prices.json file."
+        }
+        
         # no idling calculation
         $this.priceAvgWithoutIdle += $this.getUsageBasedPrice(
             0,
@@ -390,6 +408,9 @@ class KubernetesInfo {
     }
 
     [NamespaceConsumptionSummary[]] getNamespaceConsumptionByClusterId([string]$clusterId, [string]$location) {
+        return $this.getNamespaceConsumptionByClusterId($clusterId, $location, "")
+    }
+    [NamespaceConsumptionSummary[]] getNamespaceConsumptionByClusterId([string]$clusterId, [string]$location, [string]$controllerKind) {
         # trying to resolve steps per container
         try {
             if($script:prices.ContainsKey($location)) {
@@ -413,6 +434,9 @@ class KubernetesInfo {
         $namespaces = @{}
         foreach($pod in $this.getPods()) {
             if($pod.ClusterId -ne $clusterId) {
+                continue
+            }
+            if($controllerKind -ne ""  -and  $pod.ControllerKind -ine $controllerKind) {
                 continue
             }
             # create namespace if missing
@@ -472,7 +496,7 @@ foreach($cluster in Get-AzAksCluster) {
         $workspaceKubeInfo[$workspaceId] = [KubernetesInfo]::new($workspaceId)
     }
     Write-Host -ForegroundColor Blue ( "  -> Exporting Cluster Namespace Summary CSV to: " + ($subscriptionName + "__" + $cluster.ResourceGroupName + "__" + $cluster.Name + ".csv"))
-    $workspaceKubeInfo[$workspaceId].getNamespaceConsumptionByClusterId($cluster.Id, $cluster.Location) | ForEach-Object {
+    $workspaceKubeInfo[$workspaceId].getNamespaceConsumptionByClusterId($cluster.Id, $cluster.Location, "ReplicaSet") | ForEach-Object {
         $o = $_.psobject.copy()
         # round stats
         $o.SumOfAvgCPUUsageCores = [math]::Round($o.SumOfAvgCPUUsageCores, 4)
