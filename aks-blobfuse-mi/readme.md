@@ -315,7 +315,8 @@ You can either go for the automated installation or do it all manually. This is 
 1. Now you can use the persistent volume claim ``pv-blob2`` in another deployment.
 
 # Security consideration
-You should use at least 2 nodepools (a system and a user node pool) and assign the storage identities just to the system nodepool. This way your application cannot request tokens for the storage identity from the metadata endpoint.
+You should use at least 2 nodepools (a system and a user node pool) and assign the storage identities just to the user nodepool. Identity needs to be assigned where the pvs are mounted.
+You can use tains to protect the user assigned identity to schedule only authorized pods on the nodepool, that requires the pvs.
 
 
 [install-azure-cli]: https://docs.microsoft.com/en-us/cli/azure/install-azure-cli
