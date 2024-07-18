@@ -108,7 +108,7 @@ You can either go for the automated installation or do it all manually. This is 
 
 1. Get the objectID of your user-assigned managed identity
     ```bash
-    az identity list -g -g "$resourcegroup" --query "[?name == 'myaksblobmi'].principalId" -o tsv
+    az identity list -g "$resourcegroup" --query "[?name == 'myaksblobmi'].principalId" -o tsv
     ```
 
 1. Create a ``volume.yaml`` file and set objectID for ``AzureStorageIdentityObjectID``. \
